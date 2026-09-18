@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Эволюция Глупого Кота</title>
+
+    <!-- Yandex Games SDK -->
+    <script src="https://yandex.ru/games/sdk/v2"></script>
+
+    <style>
+        /* ─── Дизайн-токены ─────────────────────────────────── */
+        :root {
+            --primary:      #f1c40f;
+            --secondary:    #e74c3c;
+            --bg-dark:      #121212;
+            --text-light:   #ffffff;
+            --glass-bg:     rgba(0, 0, 0, 0.78);
+            --glass-border: rgba(255, 255, 255, 0.15);
+            --green:        #2ecc71;
+        }
+
+        /* ─── Анти-зум для тача ─────────────────────────────── */
+        html, body {
+            touch-action: manipulation;
+        }
+
+        /* ─── Базовые стили ─────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-dark);
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            color: var(--text-light);
+            transition: background-image 0.4s ease-in-out;
+            min-height: 100vh;
+            overflow-x: hidden;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.28);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* ─── Кнопка языка ──────────────────────────────────── */
+        #lang-btn {
+            position: fixed;
+            top: 14px;
+            left: 14px;
+            z-index: 200;
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            border: 1px solid var(--glass-border);
+            color: white;
+            padding: 9px 18px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            transition: background 0.2s;
+            min-height: 44px;
+        }
+        #lang-btn:hover { background: rgba(0, 0, 0, 0.75); }
+
+        /* ─── Контейнер игры — Desktop ──────────────────────── */
+        #game-container {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: row;
+            width: 95%;
+            max-width: 1200px;
+            min-height: 85vh;
+            margin: 0 auto;
+            padding: 20px 0;
+            gap: 28px;
+            align-items: stretch;
+        }
+
+        /* ─── Левая панель ──────────────────────────────────── */
+        #left-panel {
+            flex: 1.2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        #status-text {
+            font-size: 1.9rem;
+            color: var(--secondary);
+            margin: 0 0 4px 0;
+            font-weight: bold;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8), 0 0 10px rgba(231,76,60,0.55);
+            letter-spacing: 1px;
+        }
+
+        #iq-counter {
+            font-size: 4.8rem;
+            color: var(--primary);
+            margin: 0;
+            font-weight: 900;
+            text-shadow: 0 4px 15px rgba(0,0,0,0.8), 0 0 15px rgba(241,196,15,0.5);
+            line-height: 1;
+        }
+
+        #iq-sec {
+            font-size: 1.2rem;
+            color: #ffffff;
+            margin-top: 6px;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+            font-weight: 500;
+        }
+
+        #boost-status {
+            font-size: 1.1rem;
+            color: var(--green);
+            font-weight: bold;
+            margin-top: 5px;
+            min-height: 22px;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+        }
+
+        /* ─── Кот ───────────────────────────────────────────── */
+        #cat-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin: 14px 0 18px 0;
+            cursor: pointer;
+            transition: transform 0.08s;
+            flex-shrink: 0;
+        }
+        #cat-container:active { transform: scale(0.91); }
+
+        #cat-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 15px 25px rgba(0,0,0,0.6));
+            transition: filter 0.3s ease;
+            pointer-events: none;
+            -webkit-user-drag: none;
+        }
+        #cat-container:hover #cat-image {
+            filter: drop-shadow(0 20px 30px rgba(0,0,0,0.8));
+        }
+
+        /* ─── Плавающий текст +IQ ───────────────────────────── */
+        .float-text {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            color: #fff;
+            font-size: 1.7rem;
+            font-weight: bold;
+            animation: floatUp 0.9s ease-out forwards;
+            text-shadow: 0 2px 6px rgba(0,0,0,1);
+        }
+        .float-text.gold {
+            color: var(--primary);
+            font-size: 2.1rem;
+            text-shadow: 0 0 15px rgba(241,196,15,0.8), 0 2px 5px #000;
+        }
+        @keyframes floatUp {
+            0%   { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-75px) scale(1.3); }
+        }
+
+        /* ─── Прогресс-бар ──────────────────────────────────── */
+        .progress-wrapper {
+            width: 82%;
+            margin-top: auto;
+            margin-bottom: 18px;
+        }
+        #progress-container {
+            width: 100%;
+            height: 12px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+            overflow: hidden;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+        }
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #f39c12, #f1c40f);
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(241,196,15,0.5);
+            transition: width 0.3s ease-out;
+        }
+        #next-level-req {
+            font-size: 0.9rem;
+            color: #ddd;
+            margin-top: 8px;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+        }
+
+        /* ─── Кнопка Пакости ────────────────────────────────── */
+        #prank-btn {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+            border: 1px solid rgba(255,100,100,0.5);
+            padding: 16px 30px;
+            font-size: 1.2rem;
+            border-radius: 20px;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(231,76,60,0.4);
+            transition: all 0.2s ease;
+            width: 85%;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 1px;
+            margin-bottom: 18px;
+            min-height: 54px;
+        }
+        #prank-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 25px rgba(231,76,60,0.6);
+        }
+        #prank-btn:active:not(:disabled) { transform: translateY(1px); }
+        #prank-btn:disabled {
+            background: rgba(100,100,100,0.6);
+            border-color: rgba(150,150,150,0.5);
+            cursor: not-allowed;
+            color: #ccc;
+            box-shadow: none;
+        }
+
+        /* ─── Правая панель (Магазин) — Desktop ─────────────── */
+        #right-panel {
+            flex: 1;
+            max-width: 460px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 18px;
+            border: 1px solid var(--glass-border);
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            max-height: 88vh;
+            align-self: center;
+        }
+
+        .shop-header h2 {
+            text-align: center;
+            margin: 0 0 16px 0;
+            padding-bottom: 14px;
+            border-bottom: 1px solid rgba(255,255,255,0.12);
+            color: var(--primary);
+            font-size: 1.6rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        #upgrades-list {
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-right: 8px;
+        }
+        #upgrades-list::-webkit-scrollbar { width: 5px; }
+        #upgrades-list::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 10px; }
+        #upgrades-list::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 10px; }
+
+        /* ─── Карточка апгрейда ──────────────────────────────── */
+        .upgrade-item {
+            flex-shrink: 0;
+            padding: 14px 16px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.18s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 62px;
+        }
+        .upgrade-item:hover:not(.disabled) {
+            background: rgba(255,255,255,0.12);
+            transform: translateX(4px);
+            border-color: rgba(241,196,15,0.4);
+        }
+        .upgrade-item:active:not(.disabled) { transform: translateX(2px) scale(0.98); }
+        .upgrade-item.disabled {
+            opacity: 0.48;
+            background: rgba(0,0,0,0.3);
+            cursor: not-allowed;
+            border-color: rgba(255,255,255,0.05);
+        }
+
+        .upgrade-info { flex: 1; }
+        .upgrade-name { color: #fff; font-size: 1rem; font-weight: bold; margin-bottom: 3px; }
+        .upgrade-desc { font-size: 0.85rem; color: var(--green); }
+        .upgrade-level {
+            font-size: 0.75rem; color: #bbb; margin-top: 5px;
+            display: inline-block; background: rgba(255,255,255,0.1);
+            padding: 2px 7px; border-radius: 7px;
+        }
+        .upgrade-cost {
+            font-size: 0.95rem; color: #f1c40f;
+            background: rgba(0,0,0,0.4);
+            padding: 7px 10px; border-radius: 10px;
+            font-weight: bold; margin-left: 10px;
+            border: 1px solid rgba(241,196,15,0.3);
+            min-width: 88px; text-align: right;
+            flex-shrink: 0;
+        }
+
+        /* ─── Золотая мышь ───────────────────────────────────── */
+        #golden-mouse {
+            position: fixed;
+            font-size: 3.8rem;
+            cursor: pointer;
+            z-index: 1000;
+            filter: drop-shadow(0 0 15px #ffd700);
+            animation: pulseMouse 0.8s infinite alternate;
+            display: none;
+        }
+        @keyframes pulseMouse {
+            0%   { transform: scale(1)    rotate(-5deg); filter: drop-shadow(0 0 10px #ffd700); }
+            100% { transform: scale(1.15) rotate( 5deg); filter: drop-shadow(0 0 25px #ffd700); }
+        }
+
+        /* ─── Квиз ───────────────────────────────────────────── */
+        #quiz-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.72);
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        .quiz-modal {
+            background: rgba(18,18,28,0.92);
+            border-radius: 22px;
+            padding: 32px 28px;
+            text-align: center;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+            max-width: 480px;
+            width: 92%;
+        }
+        .quiz-modal h3 {
+            margin-top: 0;
+            color: var(--primary);
+            font-size: 1.5rem;
+            margin-bottom: 22px;
+        }
+        .quiz-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid var(--glass-border);
+            color: #fff;
+            padding: 14px;
+            margin: 8px 0;
+            width: 100%;
+            border-radius: 12px;
+            font-size: 1.05rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            min-height: 50px;
+        }
+        .quiz-btn:hover { background: rgba(255,255,255,0.2); }
+        .quiz-result {
+            font-size: 1.25rem;
+            margin-top: 18px;
+            display: none;
+            font-weight: bold;
+        }
+
+        /* =======================================================
+           MOBILE-FIRST — экраны max-width: 768px
+        ======================================================= */
+        @media (max-width: 768px) {
+
+            body {
+                background-attachment: scroll;
+                overflow-y: auto;
+            }
+
+            #game-container {
+                flex-direction: column;
+                align-items: center;
+                width: 100%;
+                min-height: 100svh;
+                padding: 60px 0 12px 0;
+                gap: 0;
+            }
+
+            #left-panel {
+                width: 100%;
+                padding: 0 16px;
+                justify-content: flex-start;
+                padding-top: 8px;
+            }
+
+            #status-text { font-size: 1.4rem; }
+            #iq-counter   { font-size: 3.6rem; }
+            #iq-sec       { font-size: 1rem; }
+            #boost-status { font-size: 1rem; }
+
+            #cat-container {
+                width: 220px;
+                height: 220px;
+                margin: 10px 0 12px 0;
+            }
+
+            .progress-wrapper { width: 90%; margin-bottom: 10px; }
+
+            #prank-btn {
+                width: 90%;
+                font-size: 1.1rem;
+                padding: 15px 20px;
+                margin-bottom: 14px;
+            }
+
+            /* Магазин — нижняя панель */
+            #right-panel {
+                width: 100%;
+                max-width: 100%;
+                border-radius: 20px 20px 0 0;
+                border-bottom: none;
+                padding: 16px 14px 28px 14px;
+                max-height: none;
+                align-self: auto;
+                margin-top: 6px;
+            }
+
+            .shop-header h2 {
+                font-size: 1.3rem;
+                margin-bottom: 12px;
+                padding-bottom: 10px;
+            }
+
+            /* Сетка 2 колонки */
+            #upgrades-list {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+                overflow-y: visible;
+                padding-right: 0;
+                flex: none;
+            }
+
+            .upgrade-item {
+                flex-direction: column;
+                align-items: flex-start;
+                min-height: 90px;
+                padding: 12px;
+                gap: 6px;
+            }
+
+            .upgrade-name { font-size: 0.88rem; }
+            .upgrade-desc { font-size: 0.78rem; }
+
+            .upgrade-cost {
+                margin-left: 0;
+                font-size: 0.85rem;
+                padding: 5px 8px;
+                min-width: auto;
+                align-self: flex-end;
+                width: 100%;
+                text-align: center;
+            }
+
+            .quiz-modal { padding: 24px 18px; }
+            .quiz-btn { font-size: 1rem; padding: 13px; }
+        }
+
+        @media (max-width: 380px) {
+            #upgrades-list { grid-template-columns: 1fr; }
+            #cat-container { width: 180px; height: 180px; }
+            #iq-counter { font-size: 3rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <button id="lang-btn" onclick="toggleLanguage()">&#127479;&#127482; RU</button>
+
+    <div id="game-container">
+        <!-- Левая панель (игра) -->
+        <div id="left-panel">
+            <div id="status-container">
+                <p id="status-text">1. Глупый кот</p>
+            </div>
+
+            <div class="stats">
+                <h1 id="iq-counter">0</h1>
+                <div id="iq-sec">0 IQ/сек | Клик: 1</div>
+                <div id="boost-status"></div>
+            </div>
+
+            <div id="cat-container">
+                <img id="cat-image" src="img/cat1.png" alt="Кот" draggable="false">
+            </div>
+
+            <div class="progress-wrapper">
+                <div id="progress-container">
+                    <div id="progress-bar"></div>
+                </div>
+                <div id="next-level-req">До следующей стадии: 50 IQ</div>
+            </div>
+
+            <button id="prank-btn">&#128293; Сделать пакость (x2 IQ)</button>
+        </div>
+
+        <!-- Правая панель (магазин) -->
+        <div id="right-panel">
+            <div class="shop-header">
+                <h2 id="shop-title">МАГАЗИН УЛУЧШЕНИЙ</h2>
+            </div>
+            <div id="upgrades-list"></div>
+        </div>
+    </div>
+
+    <!-- Золотая мышь -->
+    <div id="golden-mouse">&#128045;</div>
+
+    <!-- Квиз -->
+    <div id="quiz-modal-overlay">
+        <div class="quiz-modal">
+            <h3 id="quiz-question">Вопрос</h3>
+            <div id="quiz-answers"></div>
+            <div id="quiz-result" class="quiz-result"></div>
+        </div>
+    </div>
+
+    <script>
+    // =======================================================
+    //  YANDEX SDK — инициализация + автоопределение языка (п. 2.14)
+    // =======================================================
+    var ysdk = null;
+    // Языки, для которых используем русский интерфейс
+    var _CIS_LANGS = {ru: 1, be: 1, kk: 1, uk: 1, uz: 1};
+
+    (function initYSDK() {
+        if (typeof YaGames === "undefined") {
+            console.warn("[YaGames] SDK не загружен — локальный режим.");
+            return;
+        }
+        YaGames.init()
+            .then(function(sdk) {
+                ysdk = sdk;
+                console.log("[YaGames] SDK ready.");
+
+                // Автоопределение языка (п. 2.14 Яндекс.Игры):
+                // Применяем только если игрок НЕ менял язык вручную
+                if (!_langManuallySet) {
+                    var sdkLang = (sdk.environment &&
+                                   sdk.environment.i18n &&
+                                   sdk.environment.i18n.lang) || "ru";
+                    currentLang = _CIS_LANGS[sdkLang] ? "ru" : "en";
+                    console.log("[YaGames] SDK lang:", sdkLang, "-> interface:", currentLang);
+                    applyLanguage();
+                }
+            })
+            .catch(function(e) { console.warn("[YaGames] init error:", e); });
+    })();
+
+    // =======================================================
+    //  ЛОКАЛИЗАЦИЯ
+    // =======================================================
+    var langData = {
+        ru: {
+            shopTitle: "МАГАЗИН УЛУЧШЕНИЙ",
+            nextLevel: "До следующей стадии:",
+            maxLevel:  "Максимальная стадия достигнута!",
+            sec: "сек", click: "Клик",
+            prankBtn: "&#128293; Сделать пакость (x2 IQ)",
+            prankActive: "Пакость активна!",
+            activeBoosts: "Бусты:", prankBoostName: "Пакость (x2)", quizBoostName: "Квиз (x3)",
+            goldenMouse: "ЗОЛОТОЙ КУШ!",
+            quizCorrect: "Правильно! Гениальная мысль (x3 на 30с)!",
+            quizWrong: "Кот запутался!", lvl: "Ур.",
+            stages: [
+                "1. Глупый кот","2. Кот в коробке","3. Домашний бедокур",
+                "4. Кот учит букву А","5. Школьник с портфелем","6. Любитель CS 1.6",
+                "7. Студент на дошираке","8. Junior Python Разработчик",
+                "9. Фрилансер в кофейне","10. Lead Сеньор-Помидор",
+                "11. CEO Кото-Корпорации","12. Сисадмин Серверной Галактики",
+                "13. Создатель ИИ Котов","14. Кот-Сверхразум (Бог Космоса)"
+            ]
+        },
+        en: {
+            shopTitle: "UPGRADE SHOP",
+            nextLevel: "To next stage:", maxLevel: "Max stage reached!",
+            sec: "sec", click: "Click",
+            prankBtn: "&#128293; Do a Prank (x2 IQ)",
+            prankActive: "Prank active!",
+            activeBoosts: "Boosts:", prankBoostName: "Prank (x2)", quizBoostName: "Quiz (x3)",
+            goldenMouse: "GOLDEN JACKPOT!",
+            quizCorrect: "Correct! Genius thought (x3 for 30s)!",
+            quizWrong: "Cat is confused!", lvl: "Lvl",
+            stages: [
+                "1. Silly Cat","2. Cat in a Box","3. Domestic Troublemaker",
+                "4. Cat learning ABC","5. Schoolboy with a backpack","6. CS 1.6 Fan",
+                "7. Instant Noodle Student","8. Junior Python Dev",
+                "9. Freelancer at Cafe","10. Lead Senior Tomato",
+                "11. CEO of Cat Corp","12. Sysadmin of Galaxy Server",
+                "13. AI Cats Creator","14. Cosmic Overmind Cat"
+            ]
+        }
+    };
+
+    var upgradesData = {
+        ru: [
+            {name:"Вытереть слюнку",desc:"+1 к клику"},
+            {name:"Аудиокниги во сне",desc:"+1 IQ/сек"},
+            {name:"Прочитать Букварь",desc:"+10 IQ/сек"},
+            {name:"Лазерная указка",desc:"+5 к клику"},
+            {name:"Репетитор-Попугай",desc:"+50 IQ/сек"},
+            {name:"Шпора на экзамен",desc:"+25 к клику"},
+            {name:"Курсы Python",desc:"+250 IQ/сек"},
+            {name:"зелье бодрости",desc:"+100 к клику"},
+            {name:"Нейро-Ошейник",desc:"+1 500 IQ/сек"},
+            {name:"Алгоритмы и структуры",desc:"+5 000 IQ/сек"},
+            {name:"Квантовый лоток",desc:"+25 000 IQ/сек"},
+            {name:"Взлом матрицы",desc:"+100 000 IQ/сек"}
+        ],
+        en: [
+            {name:"Wipe drool",desc:"+1 to click"},
+            {name:"Audiobooks in sleep",desc:"+1 IQ/sec"},
+            {name:"Read ABC book",desc:"+10 IQ/sec"},
+            {name:"Laser pointer",desc:"+5 to click"},
+            {name:"Parrot Tutor",desc:"+50 IQ/sec"},
+            {name:"Cheat sheet",desc:"+25 to click"},
+            {name:"Python Courses",desc:"+250 IQ/sec"},
+            {name:"Cat-Bull Energy Drink",desc:"+100 to click"},
+            {name:"Neuro-Collar",desc:"+1 500 IQ/sec"},
+            {name:"Algos and Data Structures",desc:"+5 000 IQ/sec"},
+            {name:"Quantum Litter Box",desc:"+25 000 IQ/sec"},
+            {name:"Matrix Hack",desc:"+100 000 IQ/sec"}
+        ]
+    };
+
+    var quizData = {
+        ru: [
+            {q:"Сколько будет 2 + 2 * 2?",a:["8","6","10"],correct:1},
+            {q:"Что делать, если кот спит на твоей клавиатуре?",a:["Погладить","Купить новую","Выгнать"],correct:0},
+            {q:"Сколько усов у стандартного кота в среднем?",a:["4","12","100"],correct:1},
+            {q:"Как правильно писать код?",a:["Лапками","Головой","Заставить попугая"],correct:0}
+        ],
+        en: [
+            {q:"How much is 2 + 2 * 2?",a:["8","6","10"],correct:1},
+            {q:"What to do if a cat sleeps on your keyboard?",a:["Pet it","Buy a new one","Kick it"],correct:0},
+            {q:"How many whiskers does a standard cat have?",a:["4","12","100"],correct:1},
+            {q:"How to write code properly?",a:["With paws","With head","Force a parrot"],correct:0}
+        ]
+    };
+
+    // =======================================================
+    //  АССЕТЫ СТАДИЙ [0..13]
+    // =======================================================
+    var stageAssets = [
+        {req:0,          cat:"img/cat1.png",  room:"img/room1.jpg"},
+        {req:50,         cat:"img/cat2.png",  room:"img/room2.png"},
+        {req:300,        cat:"img/cat3.png",  room:"img/room3.webp"},
+        {req:1500,       cat:"img/cat4.png",  room:"img/room4.jpg"},
+        {req:5000,       cat:"img/cat5.png",  room:"img/room5.jpg"},
+        {req:15000,      cat:"img/cat6.png",  room:"img/room6.jpg"},
+        {req:50000,      cat:"img/cat7.png",  room:"img/room7.jpg"},
+        {req:150000,     cat:"img/cat8.png",  room:"img/room8.jpg"},
+        {req:500000,     cat:"img/cat9.png",  room:"img/room9.jpg"},
+        {req:1500000,    cat:"img/cat10.jpg", room:"img/room10.jpg"},
+        {req:5000000,    cat:"img/cat11.png", room:"img/room11.jpg"},
+        {req:20000000,   cat:"img/cat12.png", room:"img/room12.jfif"},
+        {req:100000000,  cat:"img/cat13.png", room:"img/room13.jpg"},
+        {req:500000000,  cat:"img/cat14.png", room:"img/room14.jfif"}
+    ];
+    var MAX_STAGE = stageAssets.length - 1; // 13
+
+    // =======================================================
+    //  СОСТОЯНИЕ ИГРЫ
+    // =======================================================
+    var iq = 0, totalIq = 0, clickPower = 1, iqPerSec = 0;
+    var currentLang = "ru", currentStageIndex = 0;
+    // true — игрок хотя бы раз нажал кнопку RU/EN; SDK-автоопределение тогда не перебивает
+    var _langManuallySet = false;
+    var isPrankActive = false, prankTimer = 0, activePrankInterval = null;
+    var isQuizBoostActive = false, quizBoostTimer = 0, activeQuizInterval = null;
+
+    var upgrades = [
+        {basePrice:15,      clickBonus:1,   secBonus:0,      count:0},
+        {basePrice:50,      clickBonus:0,   secBonus:1,      count:0},
+        {basePrice:300,     clickBonus:0,   secBonus:10,     count:0},
+        {basePrice:800,     clickBonus:5,   secBonus:0,      count:0},
+        {basePrice:2500,    clickBonus:0,   secBonus:50,     count:0},
+        {basePrice:8000,    clickBonus:25,  secBonus:0,      count:0},
+        {basePrice:25000,   clickBonus:0,   secBonus:250,    count:0},
+        {basePrice:80000,   clickBonus:100, secBonus:0,      count:0},
+        {basePrice:300000,  clickBonus:0,   secBonus:1500,   count:0},
+        {basePrice:1500000, clickBonus:0,   secBonus:5000,   count:0},
+        {basePrice:10000000,clickBonus:0,   secBonus:25000,  count:0},
+        {basePrice:50000000,clickBonus:0,   secBonus:100000, count:0}
+    ];
+
+    // =======================================================
+    //  СОХРАНЕНИЕ / ЗАГРУЗКА
+    // =======================================================
+    var SAVE_KEY = "catgame_save_v2";
+
+    function saveGame() {
+        try {
+            var data = {
+                iq: Math.floor(iq),
+                totalIq: Math.floor(totalIq),
+                lang: currentLang,
+                langManuallySet: _langManuallySet,
+                upgrades: upgrades.map(function(u){ return u.count; })
+            };
+            localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+        } catch(e) { console.warn("saveGame:", e); }
+    }
+
+    function loadGame() {
+        try {
+            var raw = localStorage.getItem(SAVE_KEY);
+            if (!raw) return;
+            var data = JSON.parse(raw);
+            if (typeof data.iq      === "number") iq      = data.iq;
+            if (typeof data.totalIq === "number") totalIq = data.totalIq;
+            // Восстанавливаем флаг ручного выбора языка
+            if (data.langManuallySet === true) _langManuallySet = true;
+            // Сохранённый язык применяем только если он был выбран вручную;
+            // иначе SDK определит язык позже в initYSDK
+            if (_langManuallySet && (data.lang === "ru" || data.lang === "en")) currentLang = data.lang;
+            if (Array.isArray(data.upgrades)) {
+                data.upgrades.forEach(function(cnt, i) {
+                    if (i < upgrades.length && typeof cnt === "number" && cnt > 0) {
+                        var diff = cnt - upgrades[i].count;
+                        upgrades[i].count  = cnt;
+                        clickPower += upgrades[i].clickBonus * diff;
+                        iqPerSec   += upgrades[i].secBonus   * diff;
+                    }
+                });
+            }
+            // Восстанавливаем стадию
+            for (var i = MAX_STAGE; i >= 0; i--) {
+                if (totalIq >= stageAssets[i].req) {
+                    currentStageIndex = i;
+                    break;
+                }
+            }
+        } catch(e) { console.warn("loadGame:", e); }
+    }
+
+    setInterval(saveGame, 10000);
+    window.addEventListener("beforeunload", saveGame);
+    document.addEventListener("visibilitychange", function() {
+        if (document.visibilityState === "hidden") saveGame();
+    });
+
+    // =======================================================
+    //  DOM
+    // =======================================================
+    var elIqCounter    = document.getElementById("iq-counter");
+    var elIqSec        = document.getElementById("iq-sec");
+    var elStatusText   = document.getElementById("status-text");
+    var elCatImage     = document.getElementById("cat-image");
+    var elCatContainer = document.getElementById("cat-container");
+    var elPrankBtn     = document.getElementById("prank-btn");
+    var elUpgradesList = document.getElementById("upgrades-list");
+    var elProgressBar  = document.getElementById("progress-bar");
+    var elNextLevelReq = document.getElementById("next-level-req");
+    var elBoostStatus  = document.getElementById("boost-status");
+    var elGoldenMouse  = document.getElementById("golden-mouse");
+    var elQuizOverlay  = document.getElementById("quiz-modal-overlay");
+    var elQuizQuestion = document.getElementById("quiz-question");
+    var elQuizAnswers  = document.getElementById("quiz-answers");
+    var elQuizResult   = document.getElementById("quiz-result");
+
+    // =======================================================
+    //  УТИЛИТЫ
+    // =======================================================
+    function getT() { return langData[currentLang]; }
+
+    function formatNumber(num) {
+        return Math.floor(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0");
+    }
+
+    function getMultiplier() {
+        var m = 1;
+        if (isPrankActive)     m *= 2;
+        if (isQuizBoostActive) m *= 3;
+        return m;
+    }
+
+    function getEventCoords(e) {
+        if (e.touches && e.touches.length > 0)
+            return {x: e.touches[0].clientX, y: e.touches[0].clientY};
+        if (e.changedTouches && e.changedTouches.length > 0)
+            return {x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY};
+        return {x: e.clientX, y: e.clientY};
+    }
+
+    function spawnFloatText(text, x, y, isGold) {
+        var el = document.createElement("div");
+        el.className = isGold ? "float-text gold" : "float-text";
+        el.textContent = text;
+        el.style.left = (x - 15) + "px";
+        el.style.top  = (y - 20) + "px";
+        document.body.appendChild(el);
+        setTimeout(function(){ el.remove(); }, 950);
+    }
+
+    // =======================================================
+    //  UI
+    // =======================================================
+    function updateUI() {
+        var t    = getT();
+        var mult = getMultiplier();
+
+        elIqCounter.textContent = formatNumber(iq);
+        elIqSec.textContent = formatNumber(iqPerSec * mult) + " IQ/" + t.sec + " | " + t.click + ": " + formatNumber(clickPower * mult);
+
+        var boosts = [];
+        if (isPrankActive)     boosts.push(t.prankBoostName);
+        if (isQuizBoostActive) boosts.push(t.quizBoostName);
+        elBoostStatus.textContent = boosts.length > 0 ? t.activeBoosts + " " + boosts.join(", ") : "";
+
+        // Проверка стадии — индекс строго в [0..MAX_STAGE]
+        var newIdx = currentStageIndex;
+        for (var i = MAX_STAGE; i >= 0; i--) {
+            if (totalIq >= stageAssets[i].req) {
+                newIdx = Math.max(0, Math.min(i, MAX_STAGE));
+                break;
+            }
+        }
+        if (newIdx !== currentStageIndex) {
+            currentStageIndex = newIdx;
+            applyStage(currentStageIndex);
+        }
+
+        // Прогресс
+        if (currentStageIndex < MAX_STAGE) {
+            var curReq  = stageAssets[currentStageIndex].req;
+            var nextReq = stageAssets[currentStageIndex + 1].req;
+            var pct = ((totalIq - curReq) / (nextReq - curReq)) * 100;
+            elProgressBar.style.width = Math.min(100, Math.max(0, pct)) + "%";
+            elNextLevelReq.textContent = t.nextLevel + " " + formatNumber(nextReq) + " IQ";
+        } else {
+            elProgressBar.style.width = "100%";
+            elNextLevelReq.textContent = t.maxLevel;
+        }
+
+        // Карточки магазина
+        var items = document.querySelectorAll(".upgrade-item");
+        items.forEach(function(el, i) {
+            var upg  = upgrades[i];
+            var cost = Math.floor(upg.basePrice * Math.pow(1.15, upg.count));
+            el.classList.toggle("disabled", iq < cost);
+            el.querySelector(".upgrade-cost").textContent  = formatNumber(cost) + " IQ";
+            el.querySelector(".upgrade-level").textContent = t.lvl + " " + upg.count;
+        });
+    }
+
+    // =======================================================
+    //  СТАДИИ
+    // =======================================================
+    function applyStage(index) {
+        var idx = Math.max(0, Math.min(index, MAX_STAGE));
+        elStatusText.textContent = getT().stages[idx];
+        if (!isPrankActive) elCatImage.src = stageAssets[idx].cat;
+        var roomSrc = stageAssets[idx].room;
+        var img = new Image();
+        img.onload  = function() { document.body.style.backgroundImage = "url('" + roomSrc + "')"; };
+        img.onerror = function() { console.warn("Фон не найден:", roomSrc); };
+        img.src = roomSrc;
+    }
+
+    // =======================================================
+    //  МАГАЗИН
+    // =======================================================
+    function renderShop() {
+        var t     = getT();
+        var uData = upgradesData[currentLang];
+        elUpgradesList.innerHTML = "";
+        upgrades.forEach(function(upg, index) {
+            var cost = Math.floor(upg.basePrice * Math.pow(1.15, upg.count));
+            var item = document.createElement("div");
+            item.className = "upgrade-item disabled";
+            item.innerHTML =
+                '<div class="upgrade-info">' +
+                    '<div class="upgrade-name">' + uData[index].name + '</div>' +
+                    '<div class="upgrade-desc">'  + uData[index].desc + '</div>' +
+                    '<div class="upgrade-level">' + t.lvl + ' ' + upg.count + '</div>' +
+                '</div>' +
+                '<div class="upgrade-cost">' + formatNumber(cost) + ' IQ</div>';
+
+            (function(idx) {
+                function doBuy(e) { e.preventDefault(); buyUpgrade(idx); }
+                item.addEventListener("touchend", doBuy, {passive: false});
+                item.addEventListener("click",    doBuy);
+            })(index);
+
+            elUpgradesList.appendChild(item);
+        });
+    }
+
+    function buyUpgrade(index) {
+        var upg  = upgrades[index];
+        var cost = Math.floor(upg.basePrice * Math.pow(1.15, upg.count));
+        if (iq < cost) return;
+        iq          -= cost;
+        upg.count++;
+        clickPower  += upg.clickBonus;
+        iqPerSec    += upg.secBonus;
+        saveGame();
+        updateUI();
+    }
+
+    // =======================================================
+    //  ЯЗЫК
+    // =======================================================
+    function toggleLanguage() {
+        // Помечаем, что игрок выбрал язык вручную — SDK-автоопределение больше не применяется
+        _langManuallySet = true;
+        currentLang = currentLang === "ru" ? "en" : "ru";
+        saveGame();
+        applyLanguage();
+    }
+
+    function applyLanguage() {
+        var t = getT();
+        document.getElementById("lang-btn").textContent = currentLang === "ru" ? "RU" : "EN";
+        document.getElementById("shop-title").textContent = t.shopTitle;
+        if (!isPrankActive) {
+            elPrankBtn.innerHTML = t.prankBtn;
+        } else {
+            elPrankBtn.textContent = t.prankActive + " (" + prankTimer + t.sec + ")";
+        }
+        renderShop();
+        applyStage(currentStageIndex);
+        updateUI();
+    }
+
+    // =======================================================
+    //  КЛИК ПО КОТУ — touch + mouse, без дублирования
+    // =======================================================
+    var _catTouchActive = false;
+
+    elCatContainer.addEventListener("touchstart", function(e) {
+        e.preventDefault();
+        _catTouchActive = true;
+        var c = getEventCoords(e);
+        doClickCat(c.x, c.y);
+    }, {passive: false});
+
+    elCatContainer.addEventListener("mousedown", function(e) {
+        if (_catTouchActive) { _catTouchActive = false; return; }
+        doClickCat(e.clientX, e.clientY);
+    });
+
+    function doClickCat(x, y) {
+        var gain = clickPower * getMultiplier();
+        iq      += gain;
+        totalIq += gain;
+        spawnFloatText("+" + formatNumber(gain), x, y, getMultiplier() > 1);
+        updateUI();
+    }
+
+    elCatImage.addEventListener("dragstart", function(e) { e.preventDefault(); });
+
+    // =======================================================
+    //  ПАКОСТЬ — Yandex Rewarded Video + fallback
+    // =======================================================
+    function activatePrank() {
+        if (isPrankActive) return;
+        isPrankActive = true;
+        prankTimer    = 60;
+        elCatImage.src       = "img/cat_prank.png";
+        elPrankBtn.disabled  = true;
+        elPrankBtn.textContent = getT().prankActive + " (" + prankTimer + getT().sec + ")";
+        updateUI();
+        activePrankInterval = setInterval(function() {
+            prankTimer--;
+            if (prankTimer > 0) {
+                elPrankBtn.textContent = getT().prankActive + " (" + prankTimer + getT().sec + ")";
+            } else {
+                clearInterval(activePrankInterval);
+                isPrankActive        = false;
+                elPrankBtn.disabled  = false;
+                elPrankBtn.innerHTML = getT().prankBtn;
+                elCatImage.src       = stageAssets[currentStageIndex].cat;
+                updateUI();
+            }
+        }, 1000);
+    }
+
+    function makePrank() {
+        if (isPrankActive) return;
+        if (ysdk && ysdk.adv) {
+            ysdk.adv.showRewardedVideo({
+                callbacks: {
+                    onRewarded: function() { activatePrank(); },
+                    onClose:    function() { /* закрыто без просмотра */ },
+                    onError:    function(err) {
+                        console.warn("[YaGames] Rewarded error:", err);
+                        activatePrank(); // fallback
+                    }
+                }
+            });
+        } else {
+            activatePrank(); // локальный режим
+        }
+    }
+
+    elPrankBtn.addEventListener("click", function(e) { e.preventDefault(); makePrank(); });
+    elPrankBtn.addEventListener("touchend", function(e) { e.preventDefault(); makePrank(); }, {passive: false});
+
+    // =======================================================
+    //  ЗОЛОТАЯ МЫШЬ — touch + mouse
+    // =======================================================
+    var goldenMouseTimeout, goldenMouseLifeTimeout;
+
+    function spawnGoldenMouse() {
+        elGoldenMouse.style.display = "block";
+        elGoldenMouse.style.top     = Math.floor(Math.random() * 75 + 12) + "%";
+        elGoldenMouse.style.left    = Math.floor(Math.random() * 80 + 10) + "%";
+        goldenMouseLifeTimeout = setTimeout(function() {
+            elGoldenMouse.style.display = "none";
+            scheduleGoldenMouse();
+        }, 10000);
+    }
+
+    function scheduleGoldenMouse() {
+        var delay = Math.floor(Math.random() * 120000) + 60000;
+        goldenMouseTimeout = setTimeout(spawnGoldenMouse, delay);
+    }
+
+    function catchGoldenMouse(e) {
+        e.preventDefault();
+        clearTimeout(goldenMouseLifeTimeout);
+        elGoldenMouse.style.display = "none";
+        var reward = Math.max(50, Math.floor(iq * 0.20));
+        iq      += reward;
+        totalIq += reward;
+        var c = getEventCoords(e);
+        spawnFloatText("+" + formatNumber(reward) + " IQ (" + getT().goldenMouse + ")", c.x, c.y, true);
+        saveGame();
+        updateUI();
+        scheduleGoldenMouse();
+    }
+
+    elGoldenMouse.addEventListener("touchstart", catchGoldenMouse, {passive: false});
+    elGoldenMouse.addEventListener("mousedown",  catchGoldenMouse);
+
+    // =======================================================
+    //  КВИЗ
+    // =======================================================
+    function startQuizBoost() {
+        isQuizBoostActive = true;
+        quizBoostTimer    = 30;
+        updateUI();
+        activeQuizInterval = setInterval(function() {
+            quizBoostTimer--;
+            if (quizBoostTimer <= 0) {
+                clearInterval(activeQuizInterval);
+                isQuizBoostActive = false;
+                updateUI();
+            }
+        }, 1000);
+    }
+
+    function spawnQuiz() {
+        var t     = getT();
+        var qArr  = quizData[currentLang];
+        var qData = qArr[Math.floor(Math.random() * qArr.length)];
+        elQuizQuestion.textContent    = qData.q;
+        elQuizAnswers.innerHTML       = "";
+        elQuizResult.style.display    = "none";
+        elQuizAnswers.style.display   = "block";
+
+        qData.a.forEach(function(ans, idx) {
+            var btn = document.createElement("button");
+            btn.className   = "quiz-btn";
+            btn.textContent = ans;
+            (function(ansIdx) {
+                function doAnswer(e) {
+                    e.preventDefault();
+                    elQuizAnswers.style.display = "none";
+                    elQuizResult.style.display  = "block";
+                    if (ansIdx === qData.correct) {
+                        elQuizResult.textContent  = t.quizCorrect;
+                        elQuizResult.style.color  = "#f1c40f";
+                        startQuizBoost();
+                    } else {
+                        elQuizResult.textContent  = t.quizWrong;
+                        elQuizResult.style.color  = "#e74c3c";
+                    }
+                    setTimeout(function() { elQuizOverlay.style.display = "none"; }, 2000);
+                }
+                btn.addEventListener("touchend", doAnswer, {passive: false});
+                btn.addEventListener("click",    doAnswer);
+            })(idx);
+            elQuizAnswers.appendChild(btn);
+        });
+        elQuizOverlay.style.display = "flex";
+    }
+
+    setInterval(spawnQuiz, 180000);
+
+    // =======================================================
+    //  ПАССИВНЫЙ ДОХОД — каждые 100мс
+    // =======================================================
+    setInterval(function() {
+        if (iqPerSec > 0) {
+            var income = (iqPerSec / 10) * getMultiplier();
+            iq      += income;
+            totalIq += income;
+            updateUI();
+        }
+    }, 100);
+
+    // =======================================================
+    //  СТАРТ
+    // =======================================================
+    loadGame();
+    applyLanguage();
+    scheduleGoldenMouse();
+
+    </script>
+</body>
+</html>
